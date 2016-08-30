@@ -27,7 +27,7 @@ import Adafruit_DHT
 ##----- classes --------------------------------------------------------------------
 
 class Sensors(object):
-""" Sensors is a base class for different sensor types """
+    """ Sensors is a base class for different sensor types """
 
     opencount = 0
     PIR_HC_SR501 = 1
@@ -54,7 +54,7 @@ class Sensors(object):
 
         
 class Sensor_DHT(Sensors):
-""" Sensor_DHT is a digital humidity/temperature class of sensor """
+    """ Sensor_DHT is a digital humidity/temperature class of sensor """
 
     def __init__(self, pin, sensortype):
         try:
@@ -86,7 +86,7 @@ class Sensor_DHT(Sensors):
 
     
 class Sensor_PIR(object):
-""" Sensor_PIR is a passive infrared motion detector class of sensor """
+    """ Sensor_PIR is a passive infrared motion detector class of sensor """
 
     def __init__(self, pin, sensortype):
         try:

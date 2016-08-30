@@ -1,4 +1,4 @@
-""" Module Cameras """
+""" wsapi_DHT """
 ##Copyright 2016 Clint H. O'Connor
 ##
 ##   Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +15,17 @@
 
 
 ##----- imports -----------------------------------------------------------------
-from flask import Flask
+from flask import Flask, request
+from Sensors import Sensors, Sensor_DHT
 import Adafruit_DHT
 
-mysensor = Adafruit_DHT.DHT11
-mypin = 14
+mypin = 21
+mysensor = Adafruit_DHT.DHT22
 myDHT = Sensor_DHT(mypin, mysensor)
+readtime, hum, temp = myDHT.read()
+
     
-app = flask.Flask(__name__)
+app = Flask(__name__)
 
 @app.route('/')
 def index():
@@ -30,12 +33,12 @@ def index():
 
 @app.route("/eiot/api1.0/temperature/")
 def get_temperature():
-    humidity, temperature = read_sensor(mysensor, mypin)
+    readtime, humidity, temperature = myDHT.read()
     return str(temperature)
 
 @app.route("/eiot/api1.0/temperature/<string:units>/")
 def get_temperature_units(units):
-    humidity, temperature = read_sensor(mysensor, mypin)
+    readtime, humidity, temperature = myDHT.read()
     if units.lower() == "c":
         return str(temperature)
     if units.lower() == "f":
@@ -45,7 +48,7 @@ def get_temperature_units(units):
 
 @app.route("/eiot/api1.0/humidity/")
 def get_humidity():
-    humidity, temperature = myDHT.read(mysensor, mypin)
+    readtime, humidity, temperature = myDHT.read()
     return str(humidity)
 
 @app.route("/exit/")
