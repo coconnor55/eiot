@@ -15,7 +15,7 @@
 
 
 ##----- imports -----------------------------------------------------------------
-from flask import Flask, request
+from flask import Flask, jsonify, request
 from Sensors import Sensors, Sensor_DHT
 import Adafruit_DHT
 
@@ -36,6 +36,16 @@ def get_temperature():
     readtime, humidity, temperature = myDHT.read()
     return str(temperature)
 
+@app.route("/eiot/api1.0/json/dht/")
+def get_temperature_js():
+    readtime, humidity, temperature = myDHT.read()
+    dht = {
+        'timestamp' : readtime,
+        'humidity' : humidity,
+        'temperature' : temperature
+        }
+    return jsonify(dht)
+
 @app.route("/eiot/api1.0/temperature/<string:units>/")
 def get_temperature_units(units):
     readtime, humidity, temperature = myDHT.read()
@@ -44,7 +54,7 @@ def get_temperature_units(units):
     if units.lower() == "f":
         return str((temperature * 1.8) + 32)
     if units.lower() == "k":
-        return str(temperature + 273)
+        return str(temperature + 273.15)
 
 @app.route("/eiot/api1.0/humidity/")
 def get_humidity():
