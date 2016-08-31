@@ -19,25 +19,31 @@ from flask import Flask, jsonify, request
 from Sensors import Sensors, Sensor_DHT
 import Adafruit_DHT
 
+
+##----- globals -----------------------------------------------------------------
+debugthis = False
+
+
+##----- globals -----------------------------------------------------------------
+app = Flask(__name__)
 mypin = 21
 mysensor = Adafruit_DHT.DHT22
 myDHT = Sensor_DHT(mypin, mysensor)
 readtime, hum, temp = myDHT.read()
-
     
-app = Flask(__name__)
 
+##----- web routes --------------------------------------------------------------
 @app.route('/')
 def index():
-    return 'Easy IOT Temperature/Humidity'
-
-@app.route("/eiot/api1.0/temperature/")
-def get_temperature():
-    readtime, humidity, temperature = myDHT.read()
-    return str(temperature)
-
-@app.route("/eiot/api1.0/json/dht/")
-def get_temperature_js():
+    return ('Easy IOT Humidity/Temperature \n' +
+            '<p><a href="eiot/api1.0/dht/json">eiot/api1.0/dht/json </a></p>' +
+            '<p><a href="eiot/api1.0/dht/humidity">eiot/api1.0/dht/humidity </a></p>' +
+            '<p><a href="eiot/api1.0/dht/temperature">eiot/api1.0/dht/temperature </a><br />' +
+            'where /c = celsius, /f = fahrenheit, /k = kelvin</p>'
+            )
+            
+@app.route("/eiot/api1.0/dht/json")
+def get_dht_js():
     readtime, humidity, temperature = myDHT.read()
     dht = {
         'timestamp' : readtime,
@@ -46,27 +52,30 @@ def get_temperature_js():
         }
     return jsonify(dht)
 
-@app.route("/eiot/api1.0/temperature/<string:units>/")
-def get_temperature_units(units):
+@app.route("/eiot/api1.0/dht/temperature/")
+@app.route("/eiot/api1.0/dht/temperature/<string:units>/")
+def get_temperature_units(units="c"):
     readtime, humidity, temperature = myDHT.read()
-    if units.lower() == "c":
+    if units[:1].lower() == "c":
         return str(temperature)
-    if units.lower() == "f":
+    if units[:1].lower() == "f":
         return str((temperature * 1.8) + 32)
-    if units.lower() == "k":
+    if units[:1].lower() == "k":
         return str(temperature + 273.15)
 
-@app.route("/eiot/api1.0/humidity/")
+@app.route("/eiot/api1.0/dht/humidity/")
 def get_humidity():
     readtime, humidity, temperature = myDHT.read()
     return str(humidity)
 
-@app.route("/exit/")
-def exit():
-    func = request.environ.get("werkzeug.server.shutdown")
-    if func is not None:
-        func()
-    return "app.exit"
-    
+if debugthis:
+    @app.route("/exit/")
+    def exit():
+        func = request.environ.get("werkzeug.server.shutdown")
+        if func is not None:
+            func()
+        return "app.exit"
+        
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=debugthis,
+            host='0.0.0.0')
