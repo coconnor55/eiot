@@ -55,12 +55,15 @@ class Sensors(object):
         
 class Sensor_DHT(Sensors):
     """ Sensor_DHT is a digital humidity/temperature class of sensor """
+    DHT11 = Adafruit_DHT.DHT11
+    DHT22 = Adafruit_DHT.DHT22
 
-    def __init__(self, pin, sensortype):
+##    def __init__(self, pin, sensortype):
+    def __init__(self, **args):
         try:
             Sensors.__init__(self)
-            self.pin = pin
-            self.sensortype = sensortype
+            self.pin = args["pin"]
+            self.sensortype = args["type"]
             self.currenthumidity = 0
             self.currenttemperature = 0
             return

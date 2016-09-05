@@ -30,7 +30,6 @@ mypin = 21
 mysensor = Adafruit_DHT.DHT22
 myDHT = Sensor_DHT(mypin, mysensor)
 readtime, hum, temp = myDHT.read()
-    
 
 ##----- web routes --------------------------------------------------------------
 @app.route('/')
