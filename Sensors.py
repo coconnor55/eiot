@@ -16,10 +16,6 @@
 
 ##----- imports -----------------------------------------------------------------
 import time
-import atexit
-from io import BytesIO
-from picamera import PiCamera
-from PIL import Image
 import RPi.GPIO as GPIO
 import Adafruit_DHT
 
@@ -29,53 +25,55 @@ import Adafruit_DHT
 class Sensors(object):
     """ Sensors is a base class for different sensor types """
 
-    opencount = 0
-    PIR_HC_SR501 = 1
+    _opencount = 0
 
     def __init__(self):
-        try:
-            Sensors.opencount += 1
-            return
-        except:
-            raise Exception("crashed: Sensors::__init__")
+        Sensors._opencount += 1
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+##        Sensors._opencount -= 1
+##        if Sensors._opencount is 0:
+##            GPIO.cleanup()
 
     def __del__(self):
-        try:
-            Sensors.opencount -= 1
-            if Sensorslf.opencount is 0:
-                GPIO.cleanup()
-            return
-        except:
-            raise Exception("crashed: Sensors::__del__")
-
-    def cleanup():
-        GPIO.cleanup()
-        return
-
+        Sensors._opencount -= 1
+        if Sensors._opencount is 0:
+            GPIO.cleanup()
+##        GPIO.cleanup()
+        pass
         
 class Sensor_DHT(Sensors):
     """ Sensor_DHT is a digital humidity/temperature class of sensor """
-    DHT11 = Adafruit_DHT.DHT11
-    DHT22 = Adafruit_DHT.DHT22
+    DHT = {
+        'DHT11' : Adafruit_DHT.DHT11,
+        'DHT22' : Adafruit_DHT.DHT22
+        }
 
 ##    def __init__(self, pin, sensortype):
+    '''__init__
+    pin= GPIO pin of sensor
+    type= type of sensor
+    '''
     def __init__(self, **args):
-        try:
-            Sensors.__init__(self)
-            self.pin = args["pin"]
-            self.sensortype = args["type"]
-            self.currenthumidity = 0
-            self.currenttemperature = 0
-            return
-        except:
-            raise Exception("crashed: Sensor_DHT::__init__")
+        Sensors.__init__(self)
+        self.pin = args['pin']
+        self.sensortype = args['type']
+        self.currenthumidity = 0
+        self.currenttemperature = 0
+
+    def __enter__(self):
+        Sensors.__enter__(self)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        Sensors.__exit__(self, type, value, traceback)
 
     def __del__(self):
-        try:
-            Sensors.__del__(self)
-            return
-        except:
-            raise Exception("crashed: Sensor_DHT::__del__")
+        Sensors.__del__(self)
 
     def read(self):
         try:
@@ -85,28 +83,37 @@ class Sensor_DHT(Sensors):
             else:
                 return time.gmtime(), None, None
         except:
-            raise Exception("crashed: Sensor_DHT::read")            
+            raise Exception(__doc__.strip() + ".read crashed")            
 
     
-class Sensor_PIR(object):
+class Sensor_PIR(Sensors):
     """ Sensor_PIR is a passive infrared motion detector class of sensor """
+    PIR = {
+        'PIR_HC_SR501' : 1
+        }
 
-    def __init__(self, pin, sensortype):
+    def __init__(self, **args):
+        Sensors.__init__(self)
         try:
             Sensors.__init__(self)
-            self.pin = pin
-            self.sensortype = sensortype
+            self.pin = args['pin']
+            self.sensortype = args['type']
             self.events = 0
             self.count = 0
             GPIO.setmode(GPIO.BCM)
             GPIO.setup(self.pin, GPIO.IN)
-            return
         except:
-            raise Exception("crashed: Sensor_PIR::__init__")
+            raise Exception(__doc__.strip() + ".__init__ crashed")
+
+    def __enter__(self):
+        Sensors.__enter__(self)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        Sensors.__exit__(self, type, value, traceback)
 
     def __del__(self):
         Sensors.__del__(self)
-        return
     
     def read(self):
         try:
@@ -114,19 +121,8 @@ class Sensor_PIR(object):
         except:
             raise Exception("crashed: Sensor_PIR::read")
 
-    def get_count(self):
-        try:
-            return self.count
-        except:
-            raise Exception("crashed: Sensor_PIR::get_events")
-
     def reset_count(self):
-        try:
-            #nonlocal _events
-            self.count = 0
-            return
-        except:
-            raise Exception("crashed: Sensor_PIR::reset_events")
+        self.count = 0
 
     def register_callback(self, callback2=None):
         try:
@@ -140,12 +136,7 @@ class Sensor_PIR(object):
             raise Exception("crashed: Sensor_PIR::register_callback")
 
     def standard_callback(self, pin):
-        try:
-            self.count = self.count + 1
-            return
-        except:
-            GPIO.remove_event_detect(self.pin)
-            raise Exception("crashed: Sensor_PIR::standard_callback")
+        self.count = self.count + 1
+        return
         
-
 
