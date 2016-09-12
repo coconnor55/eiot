@@ -27,7 +27,7 @@ from AwsPubSub import AwsClient
 from Configuration import Configuration
 
 ##----- testing -----------------------------------------------------------------
-debugthis = False
+debugthis = True
     
 
             
@@ -188,7 +188,7 @@ def __main__(argv):
 
     if debugthis and len(sys.argv) == 1:
         import args_gitignore
-        for arg1 in args_gitignore.test_args:git 
+        for arg1 in args_gitignore.test_args:
             sys.argv.extend(arg1)
         print (sys.argv)
         with open('call.txt', 'w') as fileout:

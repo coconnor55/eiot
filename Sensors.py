@@ -19,6 +19,7 @@ import time
 import RPi.GPIO as GPIO
 import Adafruit_DHT
 
+debugthis=False
 
 ##----- classes --------------------------------------------------------------------
 
@@ -60,7 +61,7 @@ class Sensor_DHT(Sensors):
     '''
     def __init__(self, **args):
         Sensors.__init__(self)
-        self.pin = args['pin']
+        self.pin = int(args['pin'])
         self.sensortype = args['type']
         self.currenthumidity = 0
         self.currenttemperature = 0
@@ -76,14 +77,11 @@ class Sensor_DHT(Sensors):
         Sensors.__del__(self)
 
     def read(self):
-        try:
-            self.currenthumidity, self.currenttemperature = Adafruit_DHT.read_retry(self.sensortype, self.pin)
-            if self.currenthumidity is not None and self.currenttemperature is not None:
-                return time.gmtime(), self.currenthumidity, self.currenttemperature
-            else:
-                return time.gmtime(), None, None
-        except:
-            raise Exception(__doc__.strip() + ".read crashed")            
+        self.currenthumidity, self.currenttemperature = Adafruit_DHT.read_retry(self.sensortype, self.pin)
+        if self.currenthumidity is not None and self.currenttemperature is not None:
+            return time.gmtime(), self.currenthumidity, self.currenttemperature
+        else:
+            return time.gmtime(), None, None
 
     
 class Sensor_PIR(Sensors):
@@ -91,19 +89,29 @@ class Sensor_PIR(Sensors):
     PIR = {
         'PIR_HC_SR501' : 1
         }
-
+    
     def __init__(self, **args):
         Sensors.__init__(self)
-        try:
-            Sensors.__init__(self)
-            self.pin = args['pin']
-            self.sensortype = args['type']
-            self.events = 0
-            self.count = 0
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setup(self.pin, GPIO.IN)
-        except:
-            raise Exception(__doc__.strip() + ".__init__ crashed")
+        self.pin = int(args['pin'])
+        self.sensortype = args['type']
+
+        # rising edge
+        self.rising_count = 0
+        self.rising_time = 0
+        self._rising_callback = None
+
+        # falling edge
+        self.falling_count = 0
+        self.falling_time = 0
+        self._falling_callback = None
+
+        # motion
+        self._motion_callback = None
+
+        # GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(int(self.pin), GPIO.IN)
+        GPIO.add_event_detect(self.pin, GPIO.BOTH, callback=self._edge_change)
 
     def __enter__(self):
         Sensors.__enter__(self)
@@ -117,26 +125,107 @@ class Sensor_PIR(Sensors):
     
     def read(self):
         try:
-            return time.gmtime(), GPIO.input(self.pin)
+            return time.gmtime(), GPIO.input(self.pin), self.rising_count, self.falling_count
         except:
             raise Exception("crashed: Sensor_PIR::read")
 
     def reset_count(self):
-        self.count = 0
+        self.rising_count = 0
+        self.falling_count = 0
 
-    def register_callback(self, callback2=None):
-        try:
-            GPIO.add_event_detect(self.pin, GPIO.RISING, bouncetime=50)
-            GPIO.add_event_callback(self.pin, callback=self.standard_callback)
-            if callback2 is not None:
-                GPIO.add_event_callback(self.pin, callback=callback2)
-            return
-
-        except:
-            raise Exception("crashed: Sensor_PIR::register_callback")
-
-    def standard_callback(self, pin):
-        self.count = self.count + 1
-        return
+    def register_callback(self, **args):
+        if 'rising' in args: self._rising_callback = args['rising']
+        if 'falling' in args: self._falling_callback = args['falling']
+        if 'motion' in args: self._motion_callback = args['motion']
         
+    def _edge_change(self, pin):
+        if GPIO.input(pin) == 1:
+            # GPIO.RISING
+            self.rising_count += 1
+            self.rising_time = int(time.time()*1000)
+            if self._rising_callback is not None: self._rising_callback(self, pin)
 
+        elif GPIO.input(pin) != 1:
+            # GPIO.FALLING
+            self.falling_count += 1
+            self.falling_time = int(time.time()*1000)
+            if self._falling_callback is not None: self._falling_callback(self, pin)
+            width = self.falling_time - self.rising_time
+            if self._motion_callback is not None: self._motion_callback(self, pin, width)
+
+class SensorState():
+    states = ['sleep', 'awake', 'alert', 'alarm']
+
+    def __init__(self, pir, callback=None):
+        self.state = 'sleep'
+        self.sleep_time = 0
+        self.awake_time = 0
+        self.alert_time = 0
+        self.alarm_time = 0
+        self.sleep_after = 60 * 1000
+        self.alert_after = 5 * 1000
+        self.alarm_after = 5 * 1000
+        self.pir = pir
+        self.callback = callback
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        pass
+    
+    def __del__(self):
+        pass
+
+    def _enter_sleep(self):
+        if debugthis: print ("entering sleep")
+        self.pir.reset_count()
+        self.sleep_time = int(time.time()*1000)
+        self.state = 'sleep'
+        if self.callback is not None: self.callback(self, self.state)
+
+    def _enter_awake(self):
+        if debugthis: print ("entering awake")
+        self.awake_time = int(time.time()*1000)
+        self.state = 'awake'
+        if self.callback is not None: self.callback(self, self.state)
+
+    def _enter_alert(self):
+        self.alert_time = int(time.time()*1000)
+        self.state = 'alert'
+        if self.callback is not None: self.callback(self, self.state)
+
+    def _enter_alarm(self):
+        self.alert_time = int(time.time()*1000)
+        self.state = 'alarm'
+        if self.callback is not None: self.callback(self, self.state)
+
+    def evaluate(self):
+        current_time = int(time.time()*1000)
+
+        # go back to sleep if there is no activity 
+        if self.state is not 'sleep' and (current_time - self.pir.rising_time > self.sleep_after
+                and current_time - self.pir.falling_time > self.sleep_after):
+            return self._enter_sleep()
+        
+        # remain asleep or transition to awake at first activity
+        if self.state is 'sleep':
+            if self.pir.rising_count > 0 or self.pir.falling_count > 0:
+                return self._enter_awake()
+
+        # remain awake or transition to alert if more activity
+        elif self.state is 'awake':
+            if (self.pir.rising_count > 2 or self.pir.falling_count > 2
+                    or (self.pir.rising_count > self.pir.falling_count
+                    and current_time - self.awake_time >= self.alert_after)):
+                return self._enter_alert()
+            
+        # remain alert or transition to alarm if more activity
+        elif self.state is 'alert':
+            if (self.pir.rising_count > 3 or self.pir.falling_count > 3
+                    or (self.pir.rising_count > self.pir.falling_count
+                    and current_time - self.alert_time >= self.alarm_after)):
+                return self._enter_alarm()
+            
+            
+        
